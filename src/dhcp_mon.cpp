@@ -227,8 +227,8 @@ static void update_cache_counter(evutil_socket_t fd, short event, void *arg) {
     int dir_value = static_cast<int>(dir);
     write_counter_to_db |= (1 << dir_value);
 
-    mStateDbPtr->hset(STATE_DB_COUNTER_UPDATE_PREFIX + downstream_if_name,
-                      gen_dir_str(dir, LOWER_CASE) + "_cache_update", "done");
+    if (write_counter_to_db == (rx_cache_updated | tx_cache_updated))
+        mStateDbPtr->del(STATE_DB_COUNTER_UPDATE_PREFIX + downstream_if_name);
     syslog(LOG_INFO, "Update %s cache counter done", dir_str.c_str());
     if (cache_db_diff && write_counter_to_db == (rx_cache_updated | tx_cache_updated)) {
         syslog(LOG_INFO, "%s COUNTERS_DB and cache counter have diff, write cache counter to COUNTERS_DB immediately\n",
@@ -350,6 +350,7 @@ static void db_update_callback(evutil_socket_t fd, short event, void *arg)
         if (elapsed.count() >= clear_counter_timeout) {
             syslog(LOG_ALERT, "Timeout for lock writing to DB\n");
             write_counter_to_db = 0b11;
+            mStateDbPtr->del(STATE_DB_COUNTER_UPDATE_PREFIX + downstream_if_name);
         } else {
             syslog(LOG_INFO, "Clear counter is ongoing, skip write counter to DB\n");
             return;
